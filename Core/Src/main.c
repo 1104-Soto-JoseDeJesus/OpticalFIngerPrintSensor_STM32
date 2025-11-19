@@ -604,7 +604,8 @@ static HAL_StatusTypeDef Fingerprint_SendCommand(uint8_t instruction,
                                                 uint16_t ack_buf_len,
                                                 uint16_t *out_len)
 {
-  uint16_t length = payload_len + 2U; /* instruction byte + checksum */
+  /* Packet length per module spec: instruction + payload + checksum */
+  uint16_t length = payload_len + 3U;
   uint16_t idx = 0;
   uint16_t checksum = 0;
 
@@ -626,7 +627,7 @@ static HAL_StatusTypeDef Fingerprint_SendCommand(uint8_t instruction,
   fp_tx_buffer[idx++] = length & 0xFF;
   fp_tx_buffer[idx++] = instruction;
 
-  checksum = FP_PACKET_COMMAND + fp_tx_buffer[7] + fp_tx_buffer[8] + instruction;
+  checksum = FP_PACKET_COMMAND + ((length >> 8) & 0xFF) + (length & 0xFF) + instruction;
 
   for (uint16_t i = 0; i < payload_len; ++i)
   {
