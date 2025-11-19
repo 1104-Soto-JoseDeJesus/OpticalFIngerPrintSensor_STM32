@@ -1034,31 +1034,13 @@ static void Fingerprint_HandleNoMatch(void)
 
 static void Fingerprint_HandleNoFinger(void)
 {
-  if (!s_announced_no_finger)
-  {
-    Fingerprint_Announce("No finger detected.\r\n");
-    s_announced_no_finger = true;
-  }
-
   s_announced_no_match = false;
-
-  HAL_GPIO_WritePin(LD1_GPIO_Port, LD1_Pin, GPIO_PIN_RESET);
-  HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_RESET);
+  s_announced_no_finger = true;
 }
 
 static void Fingerprint_HandleCommunicationFault(HAL_StatusTypeDef status)
 {
-  if (status == HAL_TIMEOUT)
-  {
-    Fingerprint_Announce("UART timeout while communicating with the fingerprint sensor.\r\n");
-  }
-  else
-  {
-    Fingerprint_Announce("UART error while communicating with the fingerprint sensor.\r\n");
-  }
-
-  HAL_GPIO_WritePin(LD1_GPIO_Port, LD1_Pin, GPIO_PIN_SET);
-  HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_SET);
+  (void)status;
 }
 
 /* USER CODE END 4 */
