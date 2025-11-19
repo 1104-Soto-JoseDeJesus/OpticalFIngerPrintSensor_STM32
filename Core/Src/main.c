@@ -133,6 +133,8 @@ static HAL_StatusTypeDef Fingerprint_Enroll(uint16_t page_id);
 static HAL_StatusTypeDef Fingerprint_CaptureAndSearch(uint16_t *page_id);
 static void Fingerprint_ReportMatch(uint16_t page_id);
 static void Fingerprint_HandleNoMatch(void);
+static void Fingerprint_EnrollDatabase(void);
+static void Fingerprint_PromptStartupEnrollment(void);
 
 /* USER CODE END PFP */
 
@@ -184,17 +186,29 @@ int main(void)
     Error_Handler();
   }
 
+  Fingerprint_PromptStartupEnrollment();
+
   Fingerprint_Announce("Sensor ready. Present a registered finger...\r\n");
 
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
+  GPIO_PinState prev_button_state = HAL_GPIO_ReadPin(USER_Btn_GPIO_Port, USER_Btn_Pin);
   while (1)
   {
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+    GPIO_PinState button_state = HAL_GPIO_ReadPin(USER_Btn_GPIO_Port, USER_Btn_Pin);
+    if ((button_state == GPIO_PIN_SET) && (prev_button_state == GPIO_PIN_RESET))
+    {
+      Fingerprint_Announce("Enrollment mode requested. Capturing templates for all configured users...\r\n");
+      Fingerprint_EnrollDatabase();
+      Fingerprint_Announce("Enrollment complete. Returning to search loop.\r\n");
+    }
+    prev_button_state = button_state;
+
     uint16_t matched_page = 0;
     HAL_StatusTypeDef status = Fingerprint_CaptureAndSearch(&matched_page);
 
@@ -634,6 +648,50 @@ static HAL_StatusTypeDef Fingerprint_CaptureAndSearch(uint16_t *page_id)
   }
 
   return Fingerprint_Search(page_id);
+}
+
+static void Fingerprint_EnrollDatabase(void)
+{
+  for (size_t i = 0; i < (sizeof(kFingerDatabase) / sizeof(kFingerDatabase[0])); ++i)
+  {
+    const FingerEntry_t *entry = &kFingerDatabase[i];
+    char msg[96];
+
+    snprintf(msg, sizeof(msg), "Starting enrollment for %s (ID %u).\r\n", entry->label, entry->page_id);
+    Fingerprint_Announce(msg);
+
+    if (Fingerprint_Enroll(entry->page_id) == HAL_OK)
+    {
+      snprintf(msg, sizeof(msg), "Enrollment successful for %s at page %u.\r\n", entry->label, entry->page_id);
+      Fingerprint_Announce(msg);
+    }
+    else
+    {
+      snprintf(msg, sizeof(msg), "Enrollment FAILED for %s (page %u). Retrying later may be required.\r\n", entry->label, entry->page_id);
+      Fingerprint_Announce(msg);
+    }
+
+    HAL_Delay(500);
+  }
+}
+
+static void Fingerprint_PromptStartupEnrollment(void)
+{
+  Fingerprint_Announce("Hold the USER button to enroll all configured fingerprints. Release to skip.\r\n");
+
+  /* Small delay to allow the button to be pressed after reset */
+  HAL_Delay(500);
+
+  if (HAL_GPIO_ReadPin(USER_Btn_GPIO_Port, USER_Btn_Pin) == GPIO_PIN_SET)
+  {
+    Fingerprint_Announce("User button detected at startup. Beginning enrollment sequence...\r\n");
+    Fingerprint_EnrollDatabase();
+    Fingerprint_Announce("Startup enrollment complete.\r\n");
+  }
+  else
+  {
+    Fingerprint_Announce("Skipping startup enrollment. You can trigger it later with the USER button.\r\n");
+  }
 }
 
 static HAL_StatusTypeDef Fingerprint_Enroll(uint16_t page_id)
