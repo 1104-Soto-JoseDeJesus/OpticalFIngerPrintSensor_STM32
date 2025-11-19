@@ -134,6 +134,7 @@ static void Fingerprint_ReportMatch(uint16_t page_id);
 static void Fingerprint_HandleNoMatch(void);
 static void Fingerprint_EnrollDatabase(void);
 static void Fingerprint_PromptStartupEnrollment(void);
+static void Fingerprint_RunConnectivityTest(void);
 
 /* USER CODE END PFP */
 
@@ -181,6 +182,8 @@ int main(void)
   HAL_Delay(800);
 
   Fingerprint_Announce("\r\n---Group 11 is da Best---\r\n");
+
+  Fingerprint_RunConnectivityTest();
 
   HAL_StatusTypeDef sensor_status = HAL_ERROR;
   for (int attempt = 0; attempt < 3; ++attempt)
@@ -538,6 +541,53 @@ static void MX_GPIO_Init(void)
 static void Fingerprint_Announce(const char *message)
 {
   HAL_UART_Transmit(&huart3, (uint8_t *)message, strlen(message), HAL_MAX_DELAY);
+}
+
+static void Fingerprint_RunConnectivityTest(void)
+{
+  Fingerprint_Announce("Running fingerprint connectivity test (verify password)...\r\n");
+
+  uint8_t payload[4] = {0x00, 0x00, 0x00, 0x00};
+  uint16_t ack_len = 0;
+  HAL_StatusTypeDef status = Fingerprint_SendCommand(0x13, payload, sizeof(payload), fp_rx_buffer, sizeof(fp_rx_buffer), &ack_len);
+
+  if (status == HAL_OK)
+  {
+    const uint8_t confirm_code = fp_rx_buffer[9];
+    char msg[160];
+
+    snprintf(msg,
+             sizeof(msg),
+             "Received %u-byte ACK. Confirm code: 0x%02X (%s)\r\n",
+             (unsigned)(ack_len + 9U),
+             confirm_code,
+             (confirm_code == FP_OK) ? "OK" : "NOT OK");
+    Fingerprint_Announce(msg);
+
+    uint16_t packet_len = ack_len + 9U;
+    if (packet_len > sizeof(fp_rx_buffer))
+    {
+      packet_len = sizeof(fp_rx_buffer);
+    }
+
+    size_t offset = 0;
+    char hex_buf[192];
+    offset += snprintf(hex_buf + offset, sizeof(hex_buf) - offset, "ACK bytes: ");
+    for (uint16_t i = 0; (i < packet_len) && (offset + 3 < sizeof(hex_buf)); ++i)
+    {
+      offset += snprintf(hex_buf + offset, sizeof(hex_buf) - offset, "%02X ", fp_rx_buffer[i]);
+    }
+    snprintf(hex_buf + offset, sizeof(hex_buf) - offset, "\r\n");
+    Fingerprint_Announce(hex_buf);
+  }
+  else if (status == HAL_TIMEOUT)
+  {
+    Fingerprint_Announce("Connectivity test: no bytes received (timeout). Check power, wiring, and UART level.\r\n");
+  }
+  else
+  {
+    Fingerprint_Announce("Connectivity test: UART error while waiting for ACK.\r\n");
+  }
 }
 
 static HAL_StatusTypeDef Fingerprint_SendCommand(uint8_t instruction,
