@@ -131,8 +131,11 @@ static void Fingerprint_Announce(const char *message);
 static HAL_StatusTypeDef Fingerprint_VerifyPassword(void);
 static HAL_StatusTypeDef Fingerprint_Enroll(uint16_t page_id);
 static HAL_StatusTypeDef Fingerprint_CaptureAndSearch(uint16_t *page_id);
+static uint16_t Fingerprint_GetMaxConfiguredPageId(void);
 static void Fingerprint_ReportMatch(uint16_t page_id);
 static void Fingerprint_HandleNoMatch(void);
+static void Fingerprint_HandleNoFinger(void);
+static void Fingerprint_HandleCommunicationFault(HAL_StatusTypeDef status);
 static void Fingerprint_EnrollDatabase(void);
 static void Fingerprint_PromptStartupEnrollment(void);
 static void Fingerprint_RunConnectivityTest(void);
@@ -244,9 +247,17 @@ int main(void)
     {
       Fingerprint_ReportMatch(matched_page);
     }
+    else if (status == HAL_BUSY)
+    {
+      Fingerprint_HandleNoFinger();
+    }
     else if (status == HAL_TIMEOUT)
     {
       Fingerprint_HandleNoMatch();
+    }
+    else
+    {
+      Fingerprint_HandleCommunicationFault(status);
     }
 
     HAL_Delay(200);
@@ -717,9 +728,19 @@ static HAL_StatusTypeDef Fingerprint_Image2Tz(uint8_t buffer_id)
 
 static HAL_StatusTypeDef Fingerprint_Search(uint16_t *page_id)
 {
-  uint8_t payload[6] = {0x01, 0x00, 0x00, 0x00, 0x00, 0xA2};
+  const uint16_t search_page_count = Fingerprint_GetMaxConfiguredPageId() + 1U;
+  uint8_t payload[5] = {
+      0x01,
+      0x00,
+      0x00,
+      (search_page_count >> 8) & 0xFF,
+      search_page_count & 0xFF};
   uint16_t ack_len = 0;
   HAL_StatusTypeDef status = Fingerprint_SendCommand(0x04, payload, sizeof(payload), fp_rx_buffer, sizeof(fp_rx_buffer), &ack_len);
+  if (status == HAL_TIMEOUT)
+  {
+    return HAL_ERROR;
+  }
   if (status != HAL_OK)
   {
     return status;
@@ -745,15 +766,38 @@ static HAL_StatusTypeDef Fingerprint_CaptureAndSearch(uint16_t *page_id)
   HAL_StatusTypeDef status = Fingerprint_GetImage();
   if (status != HAL_OK)
   {
+    if (status == HAL_TIMEOUT)
+    {
+      return HAL_ERROR;
+    }
     return status;
   }
 
-  if (Fingerprint_Image2Tz(0x01) != HAL_OK)
+  status = Fingerprint_Image2Tz(0x01);
+  if (status != HAL_OK)
   {
-    return HAL_ERROR;
+    if (status == HAL_TIMEOUT)
+    {
+      return HAL_ERROR;
+    }
+    return status;
   }
 
   return Fingerprint_Search(page_id);
+}
+
+static uint16_t Fingerprint_GetMaxConfiguredPageId(void)
+{
+  uint16_t max_page_id = 0;
+  for (size_t i = 0; i < (sizeof(kFingerDatabase) / sizeof(kFingerDatabase[0])); ++i)
+  {
+    if (kFingerDatabase[i].page_id > max_page_id)
+    {
+      max_page_id = kFingerDatabase[i].page_id;
+    }
+  }
+
+  return max_page_id;
 }
 
 static bool Fingerprint_IsUserButtonHeld(void)
@@ -973,6 +1017,28 @@ static void Fingerprint_HandleNoMatch(void)
 {
   Fingerprint_Announce("Fingerprint not recognized.\r\n");
   HAL_GPIO_WritePin(LD1_GPIO_Port, LD1_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_SET);
+}
+
+static void Fingerprint_HandleNoFinger(void)
+{
+  Fingerprint_Announce("No finger detected.\r\n");
+  HAL_GPIO_WritePin(LD1_GPIO_Port, LD1_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_RESET);
+}
+
+static void Fingerprint_HandleCommunicationFault(HAL_StatusTypeDef status)
+{
+  if (status == HAL_TIMEOUT)
+  {
+    Fingerprint_Announce("UART timeout while communicating with the fingerprint sensor.\r\n");
+  }
+  else
+  {
+    Fingerprint_Announce("UART error while communicating with the fingerprint sensor.\r\n");
+  }
+
+  HAL_GPIO_WritePin(LD1_GPIO_Port, LD1_Pin, GPIO_PIN_SET);
   HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_SET);
 }
 
