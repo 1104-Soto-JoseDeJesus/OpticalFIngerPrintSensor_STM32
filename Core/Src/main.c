@@ -187,8 +187,6 @@ int main(void)
   MX_USART6_UART_Init();
   MX_USB_OTG_FS_PCD_Init();
   /* USER CODE BEGIN 2 */
-
-  /* Give the fingerprint sensor time to power up before issuing commands. */
   HAL_Delay(800);
 
   Fingerprint_Announce("\r\n---Group 11 is da Best---\r\n");
@@ -231,8 +229,6 @@ int main(void)
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   bool enrollment_in_progress = false;
-
-  /* Initialize button state tracking for edge detection */
   (void)Fingerprint_HasUserButtonPressed();
   while (1)
   {
@@ -634,7 +630,6 @@ static HAL_StatusTypeDef Fingerprint_SendCommand(uint8_t instruction,
                                                 uint16_t ack_buf_len,
                                                 uint16_t *out_len)
 {
-  /* Packet length per module spec: instruction + payload + checksum */
   uint16_t length = payload_len + 3U;
   uint16_t idx = 0;
   uint16_t checksum = 0;
@@ -865,7 +860,7 @@ static HAL_StatusTypeDef Fingerprint_WaitForNoFinger(uint32_t timeout_ms)
     HAL_StatusTypeDef status = Fingerprint_GetImage();
     if (status == HAL_BUSY)
     {
-      return HAL_OK; /* No finger detected */
+      return HAL_OK;
     }
     if (status == HAL_TIMEOUT || status == HAL_ERROR)
     {
@@ -900,8 +895,6 @@ static void Fingerprint_EnrollDatabase(void)
     const FingerEntry_t *entry = &kFingerDatabase[i];
     char msg[96];
     bool cancel_remaining = false;
-
-    /* Ensure the sensor is clear before starting the next enrollment */
     Fingerprint_Announce("Waiting for sensor to clear before the next enrollment...\r\n");
     HAL_StatusTypeDef wait_status = Fingerprint_WaitForNoFinger(5000);
     if (wait_status != HAL_OK)
@@ -948,8 +941,6 @@ static void Fingerprint_EnrollDatabase(void)
 static void Fingerprint_PromptStartupEnrollment(void)
 {
   Fingerprint_Announce("Press the USER button to enroll all configured fingerprints. Press again to cancel.\r\n");
-
-  /* Small delay to allow the button to be pressed after reset */
   HAL_Delay(500);
 
   if (HAL_GPIO_ReadPin(USER_Btn_GPIO_Port, USER_Btn_Pin) == GPIO_PIN_SET)
@@ -1035,7 +1026,7 @@ static HAL_StatusTypeDef Fingerprint_Enroll(uint16_t page_id)
   payload[0] = 0x01;
   payload[1] = (page_id >> 8) & 0xFF;
   payload[2] = page_id & 0xFF;
-  payload[3] = 0x00; /* default permission */
+  payload[3] = 0x00;
 
   if (Fingerprint_SendCommand(0x06, payload, 4U, fp_rx_buffer, sizeof(fp_rx_buffer), NULL) != HAL_OK)
   {
