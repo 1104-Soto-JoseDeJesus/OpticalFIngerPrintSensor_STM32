@@ -538,6 +538,13 @@ static void MX_GPIO_Init(void)
 
 /* USER CODE BEGIN 4 */
 
+static HAL_StatusTypeDef Fingerprint_SendCommand(uint8_t instruction,
+                                                const uint8_t *payload,
+                                                uint16_t payload_len,
+                                                uint8_t *ack_buf,
+                                                uint16_t ack_buf_len,
+                                                uint16_t *out_len);
+
 static void Fingerprint_Announce(const char *message)
 {
   HAL_UART_Transmit(&huart3, (uint8_t *)message, strlen(message), HAL_MAX_DELAY);
