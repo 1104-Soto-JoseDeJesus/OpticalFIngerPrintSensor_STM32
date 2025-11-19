@@ -141,7 +141,10 @@ static void Fingerprint_HandleCommunicationFault(HAL_StatusTypeDef status);
 static void Fingerprint_EnrollDatabase(void);
 static void Fingerprint_PromptStartupEnrollment(void);
 static void Fingerprint_RunConnectivityTest(void);
-static bool Fingerprint_IsUserButtonHeld(void);
+static bool Fingerprint_HasUserButtonPressed(void);
+static void Fingerprint_ResetEnrollmentCancellation(void);
+static bool Fingerprint_IsEnrollmentCancelled(void);
+static void Fingerprint_RequestEnrollmentCancellation(void);
 
 /* USER CODE END PFP */
 
@@ -227,20 +230,32 @@ int main(void)
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-  GPIO_PinState prev_button_state = HAL_GPIO_ReadPin(USER_Btn_GPIO_Port, USER_Btn_Pin);
+  bool enrollment_in_progress = false;
+
+  /* Initialize button state tracking for edge detection */
+  (void)Fingerprint_HasUserButtonPressed();
   while (1)
   {
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-    GPIO_PinState button_state = HAL_GPIO_ReadPin(USER_Btn_GPIO_Port, USER_Btn_Pin);
-    if ((button_state == GPIO_PIN_SET) && (prev_button_state == GPIO_PIN_RESET))
+    if (Fingerprint_HasUserButtonPressed())
     {
-      Fingerprint_Announce("Enrollment mode requested. Capturing templates for all configured users...\r\n");
-      Fingerprint_EnrollDatabase();
-      Fingerprint_Announce("Enrollment complete. Returning to search loop.\r\n");
+      if (!enrollment_in_progress)
+      {
+        Fingerprint_Announce("Enrollment mode requested. Capturing templates for all configured users...\r\n");
+        Fingerprint_ResetEnrollmentCancellation();
+        enrollment_in_progress = true;
+        Fingerprint_EnrollDatabase();
+        Fingerprint_Announce("Enrollment complete. Returning to search loop.\r\n");
+        enrollment_in_progress = false;
+      }
+      else
+      {
+        Fingerprint_Announce("Enrollment cancellation requested. Press acknowledged.\r\n");
+        Fingerprint_RequestEnrollmentCancellation();
+      }
     }
-    prev_button_state = button_state;
 
     uint16_t matched_page = 0;
     HAL_StatusTypeDef status = Fingerprint_CaptureAndSearch(&matched_page);
@@ -802,9 +817,43 @@ static uint16_t Fingerprint_GetMaxConfiguredPageId(void)
   return max_page_id;
 }
 
-static bool Fingerprint_IsUserButtonHeld(void)
+static bool Fingerprint_HasUserButtonPressed(void)
 {
-  return HAL_GPIO_ReadPin(USER_Btn_GPIO_Port, USER_Btn_Pin) == GPIO_PIN_SET;
+  static GPIO_PinState s_prev_state = GPIO_PIN_RESET;
+
+  GPIO_PinState state = HAL_GPIO_ReadPin(USER_Btn_GPIO_Port, USER_Btn_Pin);
+  bool pressed = (state == GPIO_PIN_SET) && (s_prev_state == GPIO_PIN_RESET);
+  s_prev_state = state;
+
+  return pressed;
+}
+
+static bool s_enrollment_cancel_requested = false;
+
+static void Fingerprint_ResetEnrollmentCancellation(void)
+{
+  s_enrollment_cancel_requested = false;
+}
+
+static bool Fingerprint_IsEnrollmentCancelled(void)
+{
+  if (s_enrollment_cancel_requested)
+  {
+    return true;
+  }
+
+  if (Fingerprint_HasUserButtonPressed())
+  {
+    s_enrollment_cancel_requested = true;
+    Fingerprint_Announce("Enrollment cancelled by user button press.\r\n");
+  }
+
+  return s_enrollment_cancel_requested;
+}
+
+static void Fingerprint_RequestEnrollmentCancellation(void)
+{
+  s_enrollment_cancel_requested = true;
 }
 
 static HAL_StatusTypeDef Fingerprint_WaitForNoFinger(uint32_t timeout_ms)
@@ -823,9 +872,8 @@ static HAL_StatusTypeDef Fingerprint_WaitForNoFinger(uint32_t timeout_ms)
       return status;
     }
 
-    if (!Fingerprint_IsUserButtonHeld())
+    if (Fingerprint_IsEnrollmentCancelled())
     {
-      Fingerprint_Announce("Enrollment cancelled (USER button released).\r\n");
       return HAL_BUSY;
     }
 
@@ -841,15 +889,9 @@ static HAL_StatusTypeDef Fingerprint_WaitForNoFinger(uint32_t timeout_ms)
 
 static void Fingerprint_EnrollDatabase(void)
 {
-  if (!Fingerprint_IsUserButtonHeld())
-  {
-    Fingerprint_Announce("Enrollment cancelled before start (USER button released).\r\n");
-    return;
-  }
-
   for (size_t i = 0; i < (sizeof(kFingerDatabase) / sizeof(kFingerDatabase[0])); ++i)
   {
-    if (!Fingerprint_IsUserButtonHeld())
+    if (Fingerprint_IsEnrollmentCancelled())
     {
       Fingerprint_Announce("Enrollment cancelled by user. Returning to match mode.\r\n");
       break;
@@ -868,7 +910,7 @@ static void Fingerprint_EnrollDatabase(void)
       break;
     }
 
-    while (Fingerprint_IsUserButtonHeld())
+    while (!Fingerprint_IsEnrollmentCancelled())
     {
       snprintf(msg, sizeof(msg), "Starting enrollment for %s (ID %u).\r\n", entry->label, entry->page_id);
       Fingerprint_Announce(msg);
@@ -888,16 +930,10 @@ static void Fingerprint_EnrollDatabase(void)
         break;
       }
 
-      snprintf(msg, sizeof(msg), "Enrollment FAILED for %s (page %u). Keep holding USER to retry or release to cancel.\r\n", entry->label, entry->page_id);
+      snprintf(msg, sizeof(msg), "Enrollment FAILED for %s (page %u). Press USER again to cancel.\r\n", entry->label, entry->page_id);
       Fingerprint_Announce(msg);
 
       HAL_Delay(700);
-      if (!Fingerprint_IsUserButtonHeld())
-      {
-        Fingerprint_Announce("Enrollment cancelled by user. Returning to match mode.\r\n");
-        cancel_remaining = true;
-        break;
-      }
     }
 
     if (cancel_remaining)
@@ -911,7 +947,7 @@ static void Fingerprint_EnrollDatabase(void)
 
 static void Fingerprint_PromptStartupEnrollment(void)
 {
-  Fingerprint_Announce("Hold the USER button to enroll all configured fingerprints. Release to skip.\r\n");
+  Fingerprint_Announce("Press the USER button to enroll all configured fingerprints. Press again to cancel.\r\n");
 
   /* Small delay to allow the button to be pressed after reset */
   HAL_Delay(500);
@@ -919,6 +955,7 @@ static void Fingerprint_PromptStartupEnrollment(void)
   if (HAL_GPIO_ReadPin(USER_Btn_GPIO_Port, USER_Btn_Pin) == GPIO_PIN_SET)
   {
     Fingerprint_Announce("User button detected at startup. Beginning enrollment sequence...\r\n");
+    Fingerprint_ResetEnrollmentCancellation();
     Fingerprint_EnrollDatabase();
     Fingerprint_Announce("Startup enrollment complete.\r\n");
   }
@@ -933,9 +970,8 @@ static HAL_StatusTypeDef Fingerprint_Enroll(uint16_t page_id)
   char msg[80];
   uint8_t payload[4];
 
-  if (!Fingerprint_IsUserButtonHeld())
+  if (Fingerprint_IsEnrollmentCancelled())
   {
-    Fingerprint_Announce("Enrollment cancelled (USER button released).\r\n");
     return HAL_BUSY;
   }
 
@@ -949,9 +985,8 @@ static HAL_StatusTypeDef Fingerprint_Enroll(uint16_t page_id)
   Fingerprint_Announce(msg);
   while (Fingerprint_GetImage() == HAL_BUSY)
   {
-    if (!Fingerprint_IsUserButtonHeld())
+    if (Fingerprint_IsEnrollmentCancelled())
     {
-      Fingerprint_Announce("Enrollment cancelled (USER button released).\r\n");
       return HAL_BUSY;
     }
     HAL_Delay(100);
@@ -962,25 +997,22 @@ static HAL_StatusTypeDef Fingerprint_Enroll(uint16_t page_id)
     return HAL_ERROR;
   }
 
-  if (!Fingerprint_IsUserButtonHeld())
+  if (Fingerprint_IsEnrollmentCancelled())
   {
-    Fingerprint_Announce("Enrollment cancelled (USER button released).\r\n");
     return HAL_BUSY;
   }
 
   Fingerprint_Announce("Remove finger...\r\n");
   HAL_Delay(1500);
-  if (!Fingerprint_IsUserButtonHeld())
+  if (Fingerprint_IsEnrollmentCancelled())
   {
-    Fingerprint_Announce("Enrollment cancelled (USER button released).\r\n");
     return HAL_BUSY;
   }
   Fingerprint_Announce("Place the same finger again...\r\n");
   while (Fingerprint_GetImage() == HAL_BUSY)
   {
-    if (!Fingerprint_IsUserButtonHeld())
+    if (Fingerprint_IsEnrollmentCancelled())
     {
-      Fingerprint_Announce("Enrollment cancelled (USER button released).\r\n");
       return HAL_BUSY;
     }
     HAL_Delay(100);
