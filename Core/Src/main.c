@@ -37,7 +37,7 @@
 #define FP_DEFAULT_ADDRESS     0xFFFFFFFF
 #define FP_PACKET_COMMAND      0x01
 #define FP_PACKET_ACK          0x07
-#define FP_TIMEOUT_MS          500
+#define FP_TIMEOUT_MS          1000
 
 #define FP_OK                  0x00
 #define FP_NO_FINGER           0x02
@@ -178,9 +178,33 @@ int main(void)
   MX_USB_OTG_FS_PCD_Init();
   /* USER CODE BEGIN 2 */
 
+  /* Give the fingerprint sensor time to power up before issuing commands. */
+  HAL_Delay(800);
+
   Fingerprint_Announce("\r\n---Group 11 is da Best---\r\n");
 
-  if (Fingerprint_VerifyPassword() != HAL_OK)
+  HAL_StatusTypeDef sensor_status = HAL_ERROR;
+  for (int attempt = 0; attempt < 3; ++attempt)
+  {
+    sensor_status = Fingerprint_VerifyPassword();
+    if (sensor_status == HAL_OK)
+    {
+      break;
+    }
+
+    if (sensor_status == HAL_TIMEOUT)
+    {
+      Fingerprint_Announce("Sensor not ready yet (timeout). Retrying...\r\n");
+    }
+    else
+    {
+      Fingerprint_Announce("Sensor communication failed. Retrying...\r\n");
+    }
+
+    HAL_Delay(300);
+  }
+
+  if (sensor_status != HAL_OK)
   {
     Fingerprint_Announce("Sensor communication failed. Check wiring and power.\r\n");
     Error_Handler();
@@ -541,14 +565,16 @@ static HAL_StatusTypeDef Fingerprint_SendCommand(uint8_t instruction,
   fp_tx_buffer[idx++] = (checksum >> 8) & 0xFF;
   fp_tx_buffer[idx++] = checksum & 0xFF;
 
-  if (HAL_UART_Transmit(&huart6, fp_tx_buffer, idx, FP_TIMEOUT_MS) != HAL_OK)
+  HAL_StatusTypeDef status = HAL_UART_Transmit(&huart6, fp_tx_buffer, idx, FP_TIMEOUT_MS);
+  if (status != HAL_OK)
   {
-    return HAL_ERROR;
+    return (status == HAL_TIMEOUT) ? HAL_TIMEOUT : HAL_ERROR;
   }
 
-  if (HAL_UART_Receive(&huart6, ack_buf, 9U, FP_TIMEOUT_MS) != HAL_OK)
+  status = HAL_UART_Receive(&huart6, ack_buf, 9U, FP_TIMEOUT_MS);
+  if (status != HAL_OK)
   {
-    return HAL_ERROR;
+    return (status == HAL_TIMEOUT) ? HAL_TIMEOUT : HAL_ERROR;
   }
 
   uint16_t ack_len = ((uint16_t)ack_buf[7] << 8) | ack_buf[8];
@@ -557,9 +583,10 @@ static HAL_StatusTypeDef Fingerprint_SendCommand(uint8_t instruction,
     return HAL_ERROR;
   }
 
-  if (HAL_UART_Receive(&huart6, ack_buf + 9U, ack_len, FP_TIMEOUT_MS) != HAL_OK)
+  status = HAL_UART_Receive(&huart6, ack_buf + 9U, ack_len, FP_TIMEOUT_MS);
+  if (status != HAL_OK)
   {
-    return HAL_ERROR;
+    return (status == HAL_TIMEOUT) ? HAL_TIMEOUT : HAL_ERROR;
   }
 
   if (out_len != NULL)
@@ -574,9 +601,10 @@ static HAL_StatusTypeDef Fingerprint_VerifyPassword(void)
 {
   uint8_t payload[4] = {0x00, 0x00, 0x00, 0x00};
   uint16_t ack_len = 0;
-  if (Fingerprint_SendCommand(0x13, payload, sizeof(payload), fp_rx_buffer, sizeof(fp_rx_buffer), &ack_len) != HAL_OK)
+  HAL_StatusTypeDef status = Fingerprint_SendCommand(0x13, payload, sizeof(payload), fp_rx_buffer, sizeof(fp_rx_buffer), &ack_len);
+  if (status != HAL_OK)
   {
-    return HAL_ERROR;
+    return status;
   }
 
   uint8_t confirm_code = fp_rx_buffer[9];
@@ -586,9 +614,10 @@ static HAL_StatusTypeDef Fingerprint_VerifyPassword(void)
 static HAL_StatusTypeDef Fingerprint_GetImage(void)
 {
   uint16_t ack_len = 0;
-  if (Fingerprint_SendCommand(0x01, NULL, 0, fp_rx_buffer, sizeof(fp_rx_buffer), &ack_len) != HAL_OK)
+  HAL_StatusTypeDef status = Fingerprint_SendCommand(0x01, NULL, 0, fp_rx_buffer, sizeof(fp_rx_buffer), &ack_len);
+  if (status != HAL_OK)
   {
-    return HAL_ERROR;
+    return status;
   }
 
   uint8_t confirm_code = fp_rx_buffer[9];
@@ -603,9 +632,10 @@ static HAL_StatusTypeDef Fingerprint_Image2Tz(uint8_t buffer_id)
 {
   uint16_t ack_len = 0;
   uint8_t payload[1] = {buffer_id};
-  if (Fingerprint_SendCommand(0x02, payload, sizeof(payload), fp_rx_buffer, sizeof(fp_rx_buffer), &ack_len) != HAL_OK)
+  HAL_StatusTypeDef status = Fingerprint_SendCommand(0x02, payload, sizeof(payload), fp_rx_buffer, sizeof(fp_rx_buffer), &ack_len);
+  if (status != HAL_OK)
   {
-    return HAL_ERROR;
+    return status;
   }
   return (fp_rx_buffer[9] == FP_OK) ? HAL_OK : HAL_ERROR;
 }
@@ -614,9 +644,10 @@ static HAL_StatusTypeDef Fingerprint_Search(uint16_t *page_id)
 {
   uint8_t payload[6] = {0x01, 0x00, 0x00, 0x00, 0x00, 0xA2};
   uint16_t ack_len = 0;
-  if (Fingerprint_SendCommand(0x04, payload, sizeof(payload), fp_rx_buffer, sizeof(fp_rx_buffer), &ack_len) != HAL_OK)
+  HAL_StatusTypeDef status = Fingerprint_SendCommand(0x04, payload, sizeof(payload), fp_rx_buffer, sizeof(fp_rx_buffer), &ack_len);
+  if (status != HAL_OK)
   {
-    return HAL_ERROR;
+    return status;
   }
 
   uint8_t confirm_code = fp_rx_buffer[9];
