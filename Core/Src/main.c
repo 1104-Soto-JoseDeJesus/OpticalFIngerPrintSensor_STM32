@@ -117,6 +117,8 @@ static const FingerEntry_t kFingerDatabase[] = {
 
 static uint8_t fp_tx_buffer[32];
 static uint8_t fp_rx_buffer[32];
+static bool s_announced_no_finger = false;
+static bool s_announced_no_match = false;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -1009,20 +1011,37 @@ static void Fingerprint_ReportMatch(uint16_t page_id)
   snprintf(msg, sizeof(msg), "Fingerprint match: %s (ID %u)\r\n", label, page_id);
   Fingerprint_Announce(msg);
 
+  s_announced_no_finger = false;
+  s_announced_no_match = false;
+
   HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_RESET);
   HAL_GPIO_WritePin(LD1_GPIO_Port, LD1_Pin, GPIO_PIN_SET);
 }
 
 static void Fingerprint_HandleNoMatch(void)
 {
-  Fingerprint_Announce("Fingerprint not recognized.\r\n");
+  if (!s_announced_no_match)
+  {
+    Fingerprint_Announce("Fingerprint not recognized.\r\n");
+    s_announced_no_match = true;
+  }
+
+  s_announced_no_finger = false;
+
   HAL_GPIO_WritePin(LD1_GPIO_Port, LD1_Pin, GPIO_PIN_RESET);
   HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_SET);
 }
 
 static void Fingerprint_HandleNoFinger(void)
 {
-  Fingerprint_Announce("No finger detected.\r\n");
+  if (!s_announced_no_finger)
+  {
+    Fingerprint_Announce("No finger detected.\r\n");
+    s_announced_no_finger = true;
+  }
+
+  s_announced_no_match = false;
+
   HAL_GPIO_WritePin(LD1_GPIO_Port, LD1_Pin, GPIO_PIN_RESET);
   HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_RESET);
 }
