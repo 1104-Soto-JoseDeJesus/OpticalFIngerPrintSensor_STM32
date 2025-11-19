@@ -19,6 +19,7 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "string.h"
+#include <stdio.h>
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -32,6 +33,18 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
+#define FP_START_CODE          0xEF01
+#define FP_DEFAULT_ADDRESS     0xFFFFFFFF
+#define FP_PACKET_COMMAND      0x01
+#define FP_PACKET_ACK          0x07
+#define FP_TIMEOUT_MS          500
+
+#define FP_OK                  0x00
+#define FP_NO_FINGER           0x02
+#define FP_IMAGEFAIL           0x03
+#define FP_IMAGEMESS           0x06
+#define FP_FEATUREFAIL         0x07
+#define FP_NOMATCH             0x09
 
 /* USER CODE END PD */
 
@@ -64,10 +77,26 @@ ETH_HandleTypeDef heth;
 
 UART_HandleTypeDef huart3;
 
+UART_HandleTypeDef huart6;
+
 PCD_HandleTypeDef hpcd_USB_OTG_FS;
 
 /* USER CODE BEGIN PV */
+typedef struct
+{
+  uint16_t page_id;
+  const char *label;
+} FingerEntry_t;
 
+static const FingerEntry_t kFingerDatabase[] = {
+    {1, "Member 1 - Right Thumb"},
+    {2, "Member 2 - Right Thumb"},
+    {3, "Member 3 - Right Thumb"},
+    {4, "Member 4 - Right Thumb"},
+};
+
+static uint8_t fp_tx_buffer[32];
+static uint8_t fp_rx_buffer[32];
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -75,8 +104,15 @@ void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_ETH_Init(void);
 static void MX_USART3_UART_Init(void);
+static void MX_USART6_UART_Init(void);
 static void MX_USB_OTG_FS_PCD_Init(void);
 /* USER CODE BEGIN PFP */
+static void Fingerprint_Announce(const char *message);
+static HAL_StatusTypeDef Fingerprint_VerifyPassword(void);
+static HAL_StatusTypeDef Fingerprint_Enroll(uint16_t page_id);
+static HAL_StatusTypeDef Fingerprint_CaptureAndSearch(uint16_t *page_id);
+static void Fingerprint_ReportMatch(uint16_t page_id);
+static void Fingerprint_HandleNoMatch(void);
 
 /* USER CODE END PFP */
 
@@ -116,8 +152,19 @@ int main(void)
   MX_GPIO_Init();
   MX_ETH_Init();
   MX_USART3_UART_Init();
+  MX_USART6_UART_Init();
   MX_USB_OTG_FS_PCD_Init();
   /* USER CODE BEGIN 2 */
+
+  Fingerprint_Announce("\r\n--- Fingerprint Identification Demo ---\r\n");
+
+  if (Fingerprint_VerifyPassword() != HAL_OK)
+  {
+    Fingerprint_Announce("Sensor communication failed. Check wiring and power.\r\n");
+    Error_Handler();
+  }
+
+  Fingerprint_Announce("Sensor ready. Present a registered finger...\r\n");
 
   /* USER CODE END 2 */
 
@@ -128,6 +175,19 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+    uint16_t matched_page = 0;
+    HAL_StatusTypeDef status = Fingerprint_CaptureAndSearch(&matched_page);
+
+    if (status == HAL_OK)
+    {
+      Fingerprint_ReportMatch(matched_page);
+    }
+    else if (status == HAL_TIMEOUT)
+    {
+      Fingerprint_HandleNoMatch();
+    }
+
+    HAL_Delay(200);
   }
   /* USER CODE END 3 */
 }
@@ -274,6 +334,41 @@ static void MX_USART3_UART_Init(void)
 }
 
 /**
+  * @brief USART6 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_USART6_UART_Init(void)
+{
+
+  /* USER CODE BEGIN USART6_Init 0 */
+
+  /* USER CODE END USART6_Init 0 */
+
+  /* USER CODE BEGIN USART6_Init 1 */
+
+  /* USER CODE END USART6_Init 1 */
+  huart6.Instance = USART6;
+  huart6.Init.BaudRate = 57600;
+  huart6.Init.WordLength = UART_WORDLENGTH_8B;
+  huart6.Init.StopBits = UART_STOPBITS_1;
+  huart6.Init.Parity = UART_PARITY_NONE;
+  huart6.Init.Mode = UART_MODE_TX_RX;
+  huart6.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+  huart6.Init.OverSampling = UART_OVERSAMPLING_16;
+  huart6.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
+  huart6.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
+  if (HAL_UART_Init(&huart6) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN USART6_Init 2 */
+
+  /* USER CODE END USART6_Init 2 */
+
+}
+
+/**
   * @brief USB_OTG_FS Initialization Function
   * @param None
   * @retval None
@@ -366,6 +461,239 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
+
+static void Fingerprint_Announce(const char *message)
+{
+  HAL_UART_Transmit(&huart3, (uint8_t *)message, strlen(message), HAL_MAX_DELAY);
+}
+
+static HAL_StatusTypeDef Fingerprint_SendCommand(uint8_t instruction,
+                                                const uint8_t *payload,
+                                                uint16_t payload_len,
+                                                uint8_t *ack_buf,
+                                                uint16_t ack_buf_len,
+                                                uint16_t *out_len)
+{
+  uint16_t length = payload_len + 2U; /* instruction byte + checksum */
+  uint16_t idx = 0;
+  uint16_t checksum = 0;
+
+  if ((payload_len + 12U) > sizeof(fp_tx_buffer))
+  {
+    return HAL_ERROR;
+  }
+
+  fp_tx_buffer[idx++] = (FP_START_CODE >> 8) & 0xFF;
+  fp_tx_buffer[idx++] = FP_START_CODE & 0xFF;
+
+  fp_tx_buffer[idx++] = (FP_DEFAULT_ADDRESS >> 24) & 0xFF;
+  fp_tx_buffer[idx++] = (FP_DEFAULT_ADDRESS >> 16) & 0xFF;
+  fp_tx_buffer[idx++] = (FP_DEFAULT_ADDRESS >> 8) & 0xFF;
+  fp_tx_buffer[idx++] = FP_DEFAULT_ADDRESS & 0xFF;
+
+  fp_tx_buffer[idx++] = FP_PACKET_COMMAND;
+  fp_tx_buffer[idx++] = (length >> 8) & 0xFF;
+  fp_tx_buffer[idx++] = length & 0xFF;
+  fp_tx_buffer[idx++] = instruction;
+
+  checksum = FP_PACKET_COMMAND + fp_tx_buffer[7] + fp_tx_buffer[8] + instruction;
+
+  for (uint16_t i = 0; i < payload_len; ++i)
+  {
+    fp_tx_buffer[idx++] = payload[i];
+    checksum += payload[i];
+  }
+
+  fp_tx_buffer[idx++] = (checksum >> 8) & 0xFF;
+  fp_tx_buffer[idx++] = checksum & 0xFF;
+
+  if (HAL_UART_Transmit(&huart6, fp_tx_buffer, idx, FP_TIMEOUT_MS) != HAL_OK)
+  {
+    return HAL_ERROR;
+  }
+
+  if (HAL_UART_Receive(&huart6, ack_buf, 9U, FP_TIMEOUT_MS) != HAL_OK)
+  {
+    return HAL_ERROR;
+  }
+
+  uint16_t ack_len = ((uint16_t)ack_buf[7] << 8) | ack_buf[8];
+  if ((ack_len + 9U) > ack_buf_len)
+  {
+    return HAL_ERROR;
+  }
+
+  if (HAL_UART_Receive(&huart6, ack_buf + 9U, ack_len, FP_TIMEOUT_MS) != HAL_OK)
+  {
+    return HAL_ERROR;
+  }
+
+  if (out_len != NULL)
+  {
+    *out_len = ack_len;
+  }
+
+  return HAL_OK;
+}
+
+static HAL_StatusTypeDef Fingerprint_VerifyPassword(void)
+{
+  uint8_t payload[4] = {0x00, 0x00, 0x00, 0x00};
+  uint16_t ack_len = 0;
+  if (Fingerprint_SendCommand(0x13, payload, sizeof(payload), fp_rx_buffer, sizeof(fp_rx_buffer), &ack_len) != HAL_OK)
+  {
+    return HAL_ERROR;
+  }
+
+  uint8_t confirm_code = fp_rx_buffer[9];
+  return (confirm_code == FP_OK) ? HAL_OK : HAL_ERROR;
+}
+
+static HAL_StatusTypeDef Fingerprint_GetImage(void)
+{
+  uint16_t ack_len = 0;
+  if (Fingerprint_SendCommand(0x01, NULL, 0, fp_rx_buffer, sizeof(fp_rx_buffer), &ack_len) != HAL_OK)
+  {
+    return HAL_ERROR;
+  }
+
+  uint8_t confirm_code = fp_rx_buffer[9];
+  if (confirm_code == FP_NO_FINGER)
+  {
+    return HAL_BUSY;
+  }
+  return (confirm_code == FP_OK) ? HAL_OK : HAL_ERROR;
+}
+
+static HAL_StatusTypeDef Fingerprint_Image2Tz(uint8_t buffer_id)
+{
+  uint16_t ack_len = 0;
+  uint8_t payload[1] = {buffer_id};
+  if (Fingerprint_SendCommand(0x02, payload, sizeof(payload), fp_rx_buffer, sizeof(fp_rx_buffer), &ack_len) != HAL_OK)
+  {
+    return HAL_ERROR;
+  }
+  return (fp_rx_buffer[9] == FP_OK) ? HAL_OK : HAL_ERROR;
+}
+
+static HAL_StatusTypeDef Fingerprint_Search(uint16_t *page_id)
+{
+  uint8_t payload[6] = {0x01, 0x00, 0x00, 0x00, 0x00, 0xA2};
+  uint16_t ack_len = 0;
+  if (Fingerprint_SendCommand(0x04, payload, sizeof(payload), fp_rx_buffer, sizeof(fp_rx_buffer), &ack_len) != HAL_OK)
+  {
+    return HAL_ERROR;
+  }
+
+  uint8_t confirm_code = fp_rx_buffer[9];
+  if (confirm_code == FP_OK)
+  {
+    *page_id = ((uint16_t)fp_rx_buffer[10] << 8) | fp_rx_buffer[11];
+    return HAL_OK;
+  }
+
+  if (confirm_code == FP_NOMATCH)
+  {
+    return HAL_TIMEOUT;
+  }
+
+  return HAL_ERROR;
+}
+
+static HAL_StatusTypeDef Fingerprint_CaptureAndSearch(uint16_t *page_id)
+{
+  HAL_StatusTypeDef status = Fingerprint_GetImage();
+  if (status != HAL_OK)
+  {
+    return status;
+  }
+
+  if (Fingerprint_Image2Tz(0x01) != HAL_OK)
+  {
+    return HAL_ERROR;
+  }
+
+  return Fingerprint_Search(page_id);
+}
+
+static HAL_StatusTypeDef Fingerprint_Enroll(uint16_t page_id)
+{
+  char msg[80];
+  uint8_t payload[4];
+
+  snprintf(msg, sizeof(msg), "Place finger for enrollment ID %u...\r\n", page_id);
+  Fingerprint_Announce(msg);
+  while (Fingerprint_GetImage() == HAL_BUSY)
+  {
+    HAL_Delay(100);
+  }
+
+  if (Fingerprint_Image2Tz(0x01) != HAL_OK)
+  {
+    return HAL_ERROR;
+  }
+
+  Fingerprint_Announce("Remove finger...\r\n");
+  HAL_Delay(1500);
+  Fingerprint_Announce("Place the same finger again...\r\n");
+  while (Fingerprint_GetImage() == HAL_BUSY)
+  {
+    HAL_Delay(100);
+  }
+
+  if (Fingerprint_Image2Tz(0x02) != HAL_OK)
+  {
+    return HAL_ERROR;
+  }
+
+  if (Fingerprint_SendCommand(0x05, NULL, 0, fp_rx_buffer, sizeof(fp_rx_buffer), NULL) != HAL_OK)
+  {
+    return HAL_ERROR;
+  }
+  if (fp_rx_buffer[9] != FP_OK)
+  {
+    return HAL_ERROR;
+  }
+
+  payload[0] = 0x01;
+  payload[1] = (page_id >> 8) & 0xFF;
+  payload[2] = page_id & 0xFF;
+  payload[3] = 0x00; /* default permission */
+
+  if (Fingerprint_SendCommand(0x06, payload, 4U, fp_rx_buffer, sizeof(fp_rx_buffer), NULL) != HAL_OK)
+  {
+    return HAL_ERROR;
+  }
+
+  return (fp_rx_buffer[9] == FP_OK) ? HAL_OK : HAL_ERROR;
+}
+
+static void Fingerprint_ReportMatch(uint16_t page_id)
+{
+  const char *label = "Unknown user";
+  for (size_t i = 0; i < (sizeof(kFingerDatabase) / sizeof(kFingerDatabase[0])); ++i)
+  {
+    if (kFingerDatabase[i].page_id == page_id)
+    {
+      label = kFingerDatabase[i].label;
+      break;
+    }
+  }
+
+  char msg[96];
+  snprintf(msg, sizeof(msg), "Fingerprint match: %s (ID %u)\r\n", label, page_id);
+  Fingerprint_Announce(msg);
+
+  HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(LD1_GPIO_Port, LD1_Pin, GPIO_PIN_SET);
+}
+
+static void Fingerprint_HandleNoMatch(void)
+{
+  Fingerprint_Announce("Fingerprint not recognized.\r\n");
+  HAL_GPIO_WritePin(LD1_GPIO_Port, LD1_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_SET);
+}
 
 /* USER CODE END 4 */
 
