@@ -19,6 +19,7 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "string.h"
+#include <stdio.h>
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -533,13 +534,13 @@ static HAL_StatusTypeDef Fingerprint_SendCommand(uint8_t instruction,
   fp_tx_buffer[idx++] = (checksum >> 8) & 0xFF;
   fp_tx_buffer[idx++] = checksum & 0xFF;
 
-  HAL_StatusTypeDef status = HAL_UART_Transmit(&huart6, fp_tx_buffer, idx, FP_TIMEOUT_MS);
+  HAL_StatusTypeDef status = HAL_UART_Transmit(&huart3, fp_tx_buffer, idx, FP_TIMEOUT_MS);
   if (status != HAL_OK)
   {
     return (status == HAL_TIMEOUT) ? HAL_TIMEOUT : HAL_ERROR;
   }
 
-  status = HAL_UART_Receive(&huart6, ack_buf, 9U, FP_TIMEOUT_MS);
+  status = HAL_UART_Receive(&huart3, ack_buf, 9U, FP_TIMEOUT_MS);
   if (status != HAL_OK)
   {
     return (status == HAL_TIMEOUT) ? HAL_TIMEOUT : HAL_ERROR;
@@ -551,7 +552,7 @@ static HAL_StatusTypeDef Fingerprint_SendCommand(uint8_t instruction,
     return HAL_ERROR;
   }
 
-  status = HAL_UART_Receive(&huart6, ack_buf + 9U, ack_len, FP_TIMEOUT_MS);
+  status = HAL_UART_Receive(&huart3, ack_buf + 9U, ack_len, FP_TIMEOUT_MS);
   if (status != HAL_OK)
   {
     return (status == HAL_TIMEOUT) ? HAL_TIMEOUT : HAL_ERROR;
