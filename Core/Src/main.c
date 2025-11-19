@@ -90,9 +90,29 @@ typedef struct
 
 static const FingerEntry_t kFingerDatabase[] = {
     {1, "Member 1 - Right Thumb"},
-    {2, "Member 2 - Right Thumb"},
-    {3, "Member 3 - Right Thumb"},
-    {4, "Member 4 - Right Thumb"},
+    {2, "Member 1 - Right Index"},
+    {3, "Member 1 - Right Middle"},
+    {4, "Member 1 - Left Thumb"},
+    {5, "Member 1 - Left Index"},
+    {6, "Member 1 - Left Middle"},
+    {7, "Member 2 - Right Thumb"},
+    {8, "Member 2 - Right Index"},
+    {9, "Member 2 - Right Middle"},
+    {10, "Member 2 - Left Thumb"},
+    {11, "Member 2 - Left Index"},
+    {12, "Member 2 - Left Middle"},
+    {13, "Member 3 - Right Thumb"},
+    {14, "Member 3 - Right Index"},
+    {15, "Member 3 - Right Middle"},
+    {16, "Member 3 - Left Thumb"},
+    {17, "Member 3 - Left Index"},
+    {18, "Member 3 - Left Middle"},
+    {19, "Member 4 - Right Thumb"},
+    {20, "Member 4 - Right Index"},
+    {21, "Member 4 - Right Middle"},
+    {22, "Member 4 - Left Thumb"},
+    {23, "Member 4 - Left Index"},
+    {24, "Member 4 - Left Middle"},
 };
 
 static uint8_t fp_tx_buffer[32];
