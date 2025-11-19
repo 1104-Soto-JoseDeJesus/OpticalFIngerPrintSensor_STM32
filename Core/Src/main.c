@@ -761,6 +761,38 @@ static bool Fingerprint_IsUserButtonHeld(void)
   return HAL_GPIO_ReadPin(USER_Btn_GPIO_Port, USER_Btn_Pin) == GPIO_PIN_SET;
 }
 
+static HAL_StatusTypeDef Fingerprint_WaitForNoFinger(uint32_t timeout_ms)
+{
+  uint32_t start = HAL_GetTick();
+
+  while (1)
+  {
+    HAL_StatusTypeDef status = Fingerprint_GetImage();
+    if (status == HAL_BUSY)
+    {
+      return HAL_OK; /* No finger detected */
+    }
+    if (status == HAL_TIMEOUT || status == HAL_ERROR)
+    {
+      return status;
+    }
+
+    if (!Fingerprint_IsUserButtonHeld())
+    {
+      Fingerprint_Announce("Enrollment cancelled (USER button released).\r\n");
+      return HAL_BUSY;
+    }
+
+    if ((HAL_GetTick() - start) >= timeout_ms)
+    {
+      Fingerprint_Announce("Finger still detected. Please remove it to continue enrollment.\r\n");
+      return HAL_TIMEOUT;
+    }
+
+    HAL_Delay(100);
+  }
+}
+
 static void Fingerprint_EnrollDatabase(void)
 {
   if (!Fingerprint_IsUserButtonHeld())
@@ -779,6 +811,15 @@ static void Fingerprint_EnrollDatabase(void)
 
     const FingerEntry_t *entry = &kFingerDatabase[i];
     char msg[96];
+
+    /* Ensure the sensor is clear before starting the next enrollment */
+    Fingerprint_Announce("Waiting for sensor to clear before the next enrollment...\r\n");
+    HAL_StatusTypeDef wait_status = Fingerprint_WaitForNoFinger(5000);
+    if (wait_status != HAL_OK)
+    {
+      Fingerprint_Announce("Enrollment halted because a finger remained on the sensor. Try again once it is removed.\r\n");
+      break;
+    }
 
     snprintf(msg, sizeof(msg), "Starting enrollment for %s (ID %u).\r\n", entry->label, entry->page_id);
     Fingerprint_Announce(msg);
@@ -831,6 +872,12 @@ static HAL_StatusTypeDef Fingerprint_Enroll(uint16_t page_id)
   if (!Fingerprint_IsUserButtonHeld())
   {
     Fingerprint_Announce("Enrollment cancelled (USER button released).\r\n");
+    return HAL_BUSY;
+  }
+
+  Fingerprint_Announce("Ensuring sensor is clear before capturing a new enrollment...\r\n");
+  if (Fingerprint_WaitForNoFinger(5000) != HAL_OK)
+  {
     return HAL_BUSY;
   }
 
