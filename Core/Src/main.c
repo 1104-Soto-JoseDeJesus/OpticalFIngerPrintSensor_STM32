@@ -75,7 +75,7 @@ ETH_TxPacketConfig TxConfig;
 
 ETH_HandleTypeDef heth;
 
-UART_HandleTypeDef huart3;
+UART_HandleTypeDef huart6;
 
 PCD_HandleTypeDef hpcd_USB_OTG_FS;
 
@@ -121,7 +121,7 @@ static uint8_t fp_rx_buffer[32];
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_ETH_Init(void);
-static void MX_USART3_UART_Init(void);
+static void MX_USART6_UART_Init(void);
 static void MX_USB_OTG_FS_PCD_Init(void);
 /* USER CODE BEGIN PFP */
 static void Fingerprint_Announce(const char *message);
@@ -170,7 +170,7 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_ETH_Init();
-  MX_USART3_UART_Init();
+  MX_USART6_UART_Init();
   MX_USB_OTG_FS_PCD_Init();
   /* USER CODE BEGIN 2 */
 
@@ -353,37 +353,37 @@ static void MX_ETH_Init(void)
 }
 
 /**
-  * @brief USART3 Initialization Function
+  * @brief USART6 Initialization Function
   * @param None
   * @retval None
   */
-static void MX_USART3_UART_Init(void)
+static void MX_USART6_UART_Init(void)
 {
 
-  /* USER CODE BEGIN USART3_Init 0 */
+  /* USER CODE BEGIN USART6_Init 0 */
 
-  /* USER CODE END USART3_Init 0 */
+  /* USER CODE END USART6_Init 0 */
 
-  /* USER CODE BEGIN USART3_Init 1 */
+  /* USER CODE BEGIN USART6_Init 1 */
 
-  /* USER CODE END USART3_Init 1 */
-  huart3.Instance = USART3;
-  huart3.Init.BaudRate = 115200;
-  huart3.Init.WordLength = UART_WORDLENGTH_8B;
-  huart3.Init.StopBits = UART_STOPBITS_1;
-  huart3.Init.Parity = UART_PARITY_NONE;
-  huart3.Init.Mode = UART_MODE_TX_RX;
-  huart3.Init.HwFlowCtl = UART_HWCONTROL_NONE;
-  huart3.Init.OverSampling = UART_OVERSAMPLING_16;
-  huart3.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
-  huart3.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
-  if (HAL_UART_Init(&huart3) != HAL_OK)
+  /* USER CODE END USART6_Init 1 */
+  huart6.Instance = USART6;
+  huart6.Init.BaudRate = 57600;
+  huart6.Init.WordLength = UART_WORDLENGTH_8B;
+  huart6.Init.StopBits = UART_STOPBITS_1;
+  huart6.Init.Parity = UART_PARITY_NONE;
+  huart6.Init.Mode = UART_MODE_TX_RX;
+  huart6.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+  huart6.Init.OverSampling = UART_OVERSAMPLING_16;
+  huart6.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
+  huart6.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
+  if (HAL_UART_Init(&huart6) != HAL_OK)
   {
     Error_Handler();
   }
-  /* USER CODE BEGIN USART3_Init 2 */
+  /* USER CODE BEGIN USART6_Init 2 */
 
-  /* USER CODE END USART3_Init 2 */
+  /* USER CODE END USART6_Init 2 */
 
 }
 
@@ -475,7 +475,7 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_Init(USB_OverCurrent_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pins : PG9 PG14 */
-  GPIO_InitStruct.Pin = GPIO_PIN_9|GPIO_PIN_14;
+  GPIO_InitStruct.Pin = FP_UART_RX_Pin|FP_UART_TX_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
@@ -491,7 +491,7 @@ static void MX_GPIO_Init(void)
 
 static void Fingerprint_Announce(const char *message)
 {
-  HAL_UART_Transmit(&huart3, (uint8_t *)message, strlen(message), HAL_MAX_DELAY);
+  HAL_UART_Transmit(&huart6, (uint8_t *)message, strlen(message), HAL_MAX_DELAY);
 }
 
 static HAL_StatusTypeDef Fingerprint_SendCommand(uint8_t instruction,
@@ -534,13 +534,13 @@ static HAL_StatusTypeDef Fingerprint_SendCommand(uint8_t instruction,
   fp_tx_buffer[idx++] = (checksum >> 8) & 0xFF;
   fp_tx_buffer[idx++] = checksum & 0xFF;
 
-  HAL_StatusTypeDef status = HAL_UART_Transmit(&huart3, fp_tx_buffer, idx, FP_TIMEOUT_MS);
+  HAL_StatusTypeDef status = HAL_UART_Transmit(&huart6, fp_tx_buffer, idx, FP_TIMEOUT_MS);
   if (status != HAL_OK)
   {
     return (status == HAL_TIMEOUT) ? HAL_TIMEOUT : HAL_ERROR;
   }
 
-  status = HAL_UART_Receive(&huart3, ack_buf, 9U, FP_TIMEOUT_MS);
+  status = HAL_UART_Receive(&huart6, ack_buf, 9U, FP_TIMEOUT_MS);
   if (status != HAL_OK)
   {
     return (status == HAL_TIMEOUT) ? HAL_TIMEOUT : HAL_ERROR;
@@ -552,7 +552,7 @@ static HAL_StatusTypeDef Fingerprint_SendCommand(uint8_t instruction,
     return HAL_ERROR;
   }
 
-  status = HAL_UART_Receive(&huart3, ack_buf + 9U, ack_len, FP_TIMEOUT_MS);
+  status = HAL_UART_Receive(&huart6, ack_buf + 9U, ack_len, FP_TIMEOUT_MS);
   if (status != HAL_OK)
   {
     return (status == HAL_TIMEOUT) ? HAL_TIMEOUT : HAL_ERROR;
