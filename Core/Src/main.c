@@ -857,6 +857,7 @@ static void Fingerprint_EnrollDatabase(void)
 
     const FingerEntry_t *entry = &kFingerDatabase[i];
     char msg[96];
+    bool cancel_remaining = false;
 
     /* Ensure the sensor is clear before starting the next enrollment */
     Fingerprint_Announce("Waiting for sensor to clear before the next enrollment...\r\n");
@@ -867,24 +868,41 @@ static void Fingerprint_EnrollDatabase(void)
       break;
     }
 
-    snprintf(msg, sizeof(msg), "Starting enrollment for %s (ID %u).\r\n", entry->label, entry->page_id);
-    Fingerprint_Announce(msg);
+    while (Fingerprint_IsUserButtonHeld())
+    {
+      snprintf(msg, sizeof(msg), "Starting enrollment for %s (ID %u).\r\n", entry->label, entry->page_id);
+      Fingerprint_Announce(msg);
 
-    HAL_StatusTypeDef enroll_status = Fingerprint_Enroll(entry->page_id);
-    if (enroll_status == HAL_OK)
-    {
-      snprintf(msg, sizeof(msg), "Enrollment successful for %s at page %u.\r\n", entry->label, entry->page_id);
+      HAL_StatusTypeDef enroll_status = Fingerprint_Enroll(entry->page_id);
+      if (enroll_status == HAL_OK)
+      {
+        snprintf(msg, sizeof(msg), "Enrollment successful for %s at page %u.\r\n", entry->label, entry->page_id);
+        Fingerprint_Announce(msg);
+        break;
+      }
+
+      if (enroll_status == HAL_BUSY)
+      {
+        Fingerprint_Announce("Enrollment cancelled by user. Returning to match mode.\r\n");
+        cancel_remaining = true;
+        break;
+      }
+
+      snprintf(msg, sizeof(msg), "Enrollment FAILED for %s (page %u). Keep holding USER to retry or release to cancel.\r\n", entry->label, entry->page_id);
       Fingerprint_Announce(msg);
+
+      HAL_Delay(700);
+      if (!Fingerprint_IsUserButtonHeld())
+      {
+        Fingerprint_Announce("Enrollment cancelled by user. Returning to match mode.\r\n");
+        cancel_remaining = true;
+        break;
+      }
     }
-    else if (enroll_status == HAL_BUSY)
+
+    if (cancel_remaining)
     {
-      Fingerprint_Announce("Enrollment cancelled by user. Returning to match mode.\r\n");
       break;
-    }
-    else
-    {
-      snprintf(msg, sizeof(msg), "Enrollment FAILED for %s (page %u). Retrying later may be required.\r\n", entry->label, entry->page_id);
-      Fingerprint_Announce(msg);
     }
 
     HAL_Delay(500);
