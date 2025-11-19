@@ -156,7 +156,7 @@ int main(void)
   MX_USB_OTG_FS_PCD_Init();
   /* USER CODE BEGIN 2 */
 
-  Fingerprint_Announce("\r\n--- Fingerprint Identification Demo ---\r\n");
+  Fingerprint_Announce("\r\n---Group 11 is da Best---\r\n");
 
   if (Fingerprint_VerifyPassword() != HAL_OK)
   {
