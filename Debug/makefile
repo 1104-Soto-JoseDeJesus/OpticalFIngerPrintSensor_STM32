@@ -61,8 +61,8 @@ all: main-build
 main-build: EE426_Project2.elf secondary-outputs
 
 # Tool invocations
-EE426_Project2.elf EE426_Project2.map: $(OBJS) $(USER_OBJS) ../STM32F767ZITX_FLASH.ld makefile objects.list $(OPTIONAL_TOOL_DEPS)
-	arm-none-eabi-gcc -o "EE426_Project2.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m7 -T"../STM32F767ZITX_FLASH.ld" --specs=nosys.specs -Wl,-Map="EE426_Project2.map" -Wl,--gc-sections -static --specs=nano.specs -mfpu=fpv5-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
+EE426_Project2.elf EE426_Project2.map: $(OBJS) $(USER_OBJS) C:\Users\josee\OneDrive\Documents\EE426\EE426_Project2\STM32F767ZITX_FLASH.ld makefile objects.list $(OPTIONAL_TOOL_DEPS)
+	arm-none-eabi-gcc -o "EE426_Project2.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m7 -T"C:\Users\josee\OneDrive\Documents\EE426\EE426_Project2\STM32F767ZITX_FLASH.ld" --specs=nosys.specs -Wl,-Map="EE426_Project2.map" -Wl,--gc-sections -static --specs=nano.specs -mfpu=fpv5-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
 	@echo 'Finished building target: $@'
 	@echo ' '
 

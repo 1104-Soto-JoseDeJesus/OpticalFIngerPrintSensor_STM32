@@ -204,11 +204,11 @@ int main(void)
 
     if (sensor_status == HAL_TIMEOUT)
     {
-      Fingerprint_Announce("Sensor not ready yet (timeout). Retrying...\r\n");
+      Fingerprint_Announce("Sensor not workinggg\r\n");
     }
     else
     {
-      Fingerprint_Announce("Sensor communication failed. Retrying...\r\n");
+      Fingerprint_Announce("Sensor not workinggg\r\n");
     }
 
     HAL_Delay(300);
@@ -216,13 +216,13 @@ int main(void)
 
   if (sensor_status != HAL_OK)
   {
-    Fingerprint_Announce("Sensor communication failed. Check wiring and power.\r\n");
+    Fingerprint_Announce("CHECK DA WIRES\r\n");
     Error_Handler();
   }
 
   Fingerprint_PromptStartupEnrollment();
 
-  Fingerprint_Announce("Sensor ready. Present a registered finger...\r\n");
+  Fingerprint_Announce("Place your finger on the panel\r\n");
 
   /* USER CODE END 2 */
 
@@ -239,16 +239,16 @@ int main(void)
     {
       if (!enrollment_in_progress)
       {
-        Fingerprint_Announce("Enrollment mode requested. Capturing templates for all configured users...\r\n");
+        Fingerprint_Announce("Registering our prints\r\n");
         Fingerprint_ResetEnrollmentCancellation();
         enrollment_in_progress = true;
         Fingerprint_EnrollDatabase();
-        Fingerprint_Announce("Enrollment complete. Returning to search loop.\r\n");
+        Fingerprint_Announce("Registering complete\r\n");
         enrollment_in_progress = false;
       }
       else
       {
-        Fingerprint_Announce("Enrollment cancellation requested. Press acknowledged.\r\n");
+        Fingerprint_Announce("Registration stopped\r\n");
         Fingerprint_RequestEnrollmentCancellation();
       }
     }
@@ -578,7 +578,7 @@ static void Fingerprint_Announce(const char *message)
 
 static void Fingerprint_RunConnectivityTest(void)
 {
-  Fingerprint_Announce("Running fingerprint connectivity test (verify password)...\r\n");
+  Fingerprint_Announce("Connection Test\r\n");
 
   uint8_t payload[4] = {0x00, 0x00, 0x00, 0x00};
   uint16_t ack_len = 0;
@@ -840,7 +840,7 @@ static bool Fingerprint_IsEnrollmentCancelled(void)
   if (Fingerprint_HasUserButtonPressed())
   {
     s_enrollment_cancel_requested = true;
-    Fingerprint_Announce("Enrollment cancelled by user button press.\r\n");
+    Fingerprint_Announce("Registration cencelled\r\n");
   }
 
   return s_enrollment_cancel_requested;
@@ -874,7 +874,7 @@ static HAL_StatusTypeDef Fingerprint_WaitForNoFinger(uint32_t timeout_ms)
 
     if ((HAL_GetTick() - start) >= timeout_ms)
     {
-      Fingerprint_Announce("Finger still detected. Please remove it to continue enrollment.\r\n");
+      Fingerprint_Announce("Finger still detected. Remove it to continue registration.\r\n");
       return HAL_TIMEOUT;
     }
 
@@ -888,7 +888,7 @@ static void Fingerprint_EnrollDatabase(void)
   {
     if (Fingerprint_IsEnrollmentCancelled())
     {
-      Fingerprint_Announce("Enrollment cancelled by user. Returning to match mode.\r\n");
+      Fingerprint_Announce("Registration cancelled by user\r\n");
       break;
     }
 
@@ -940,7 +940,7 @@ static void Fingerprint_EnrollDatabase(void)
 
 static void Fingerprint_PromptStartupEnrollment(void)
 {
-  Fingerprint_Announce("Press the USER button to enroll all configured fingerprints. Press again to cancel.\r\n");
+  Fingerprint_Announce("Press the USER button to start Registering. Press again to cancel.\r\n");
   HAL_Delay(500);
 
   if (HAL_GPIO_ReadPin(USER_Btn_GPIO_Port, USER_Btn_Pin) == GPIO_PIN_SET)
