@@ -952,7 +952,7 @@ static void Fingerprint_PromptStartupEnrollment(void)
   }
   else
   {
-    Fingerprint_Announce("Skipping startup enrollment. You can trigger it later with the USER button.\r\n");
+    Fingerprint_Announce("SKIPPING\r\n");
   }
 }
 

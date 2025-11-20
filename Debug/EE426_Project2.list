@@ -7,27 +7,27 @@ Idx Name          Size      VMA       LMA       File off  Algn
                   CONTENTS, ALLOC, LOAD, READONLY, DATA
   1 .text         000057f0  08000200  08000200  00001200  2**4
                   CONTENTS, ALLOC, LOAD, READONLY, CODE
-  2 .rodata       000008b4  080059f0  080059f0  000069f0  2**2
+  2 .rodata       000008a4  080059f0  080059f0  000069f0  2**2
                   CONTENTS, ALLOC, LOAD, READONLY, DATA
-  3 .ARM.extab    00000000  080062a4  080062a4  0000819c  2**0
+  3 .ARM.extab    00000000  08006294  08006294  0000819c  2**0
                   CONTENTS, READONLY
-  4 .ARM          00000008  080062a4  080062a4  000072a4  2**2
+  4 .ARM          00000008  08006294  08006294  00007294  2**2
                   CONTENTS, ALLOC, LOAD, READONLY, DATA
-  5 .preinit_array 00000000  080062ac  080062ac  0000819c  2**0
+  5 .preinit_array 00000000  0800629c  0800629c  0000819c  2**0
                   CONTENTS, ALLOC, LOAD, DATA
-  6 .init_array   00000004  080062ac  080062ac  000072ac  2**2
+  6 .init_array   00000004  0800629c  0800629c  0000729c  2**2
                   CONTENTS, ALLOC, LOAD, READONLY, DATA
-  7 .fini_array   00000004  080062b0  080062b0  000072b0  2**2
+  7 .fini_array   00000004  080062a0  080062a0  000072a0  2**2
                   CONTENTS, ALLOC, LOAD, READONLY, DATA
-  8 .data         0000005c  20000000  080062b4  00008000  2**2
+  8 .data         0000005c  20000000  080062a4  00008000  2**2
                   CONTENTS, ALLOC, LOAD, DATA
-  9 .RxDecripSection 000000a0  2000005c  08006310  0000805c  2**2
+  9 .RxDecripSection 000000a0  2000005c  08006300  0000805c  2**2
                   CONTENTS, ALLOC, LOAD, DATA
- 10 .TxDecripSection 000000a0  200000fc  080063b0  000080fc  2**2
+ 10 .TxDecripSection 000000a0  200000fc  080063a0  000080fc  2**2
                   CONTENTS, ALLOC, LOAD, DATA
- 11 .bss          00000890  2000019c  08006450  0000819c  2**2
+ 11 .bss          00000890  2000019c  08006440  0000819c  2**2
                   ALLOC
- 12 ._user_heap_stack 00000604  20000a2c  08006450  00008a2c  2**0
+ 12 ._user_heap_stack 00000604  20000a2c  08006440  00008a2c  2**0
                   ALLOC
  13 .ARM.attributes 0000002e  00000000  00000000  0000819c  2**0
                   CONTENTS, READONLY
@@ -2313,7 +2313,7 @@ static uint16_t Fingerprint_GetMaxConfiguredPageId(void)
  8001154:	f85d 7b04 	ldr.w	r7, [sp], #4
  8001158:	4770      	bx	lr
  800115a:	bf00      	nop
- 800115c:	08006198 	.word	0x08006198
+ 800115c:	08006188 	.word	0x08006188
 
 08001160 <Fingerprint_HasUserButtonPressed>:
 
@@ -2683,7 +2683,7 @@ static void Fingerprint_EnrollDatabase(void)
  80013a0:	bd80      	pop	{r7, pc}
  80013a2:	bf00      	nop
  80013a4:	08005e0c 	.word	0x08005e0c
- 80013a8:	08006198 	.word	0x08006198
+ 80013a8:	08006188 	.word	0x08006188
  80013ac:	08005e30 	.word	0x08005e30
  80013b0:	08005e6c 	.word	0x08005e6c
  80013b4:	08005ec8 	.word	0x08005ec8
@@ -2697,7 +2697,7 @@ static void Fingerprint_PromptStartupEnrollment(void)
 {
  80013c4:	b580      	push	{r7, lr}
  80013c6:	af00      	add	r7, sp, #0
-  Fingerprint_Announce("Press the USER button to enroll all configured fingerprints. Press again to cancel.\r\n");
+  Fingerprint_Announce("Press the USER button to start Registering. Press again to cancel.\r\n");
  80013c8:	480f      	ldr	r0, [pc, #60]	@ (8001408 <Fingerprint_PromptStartupEnrollment+0x44>)
  80013ca:	f7ff fbd9 	bl	8000b80 <Fingerprint_Announce>
   HAL_Delay(500);
@@ -2738,9 +2738,9 @@ static void Fingerprint_PromptStartupEnrollment(void)
  8001406:	bf00      	nop
  8001408:	08005f9c 	.word	0x08005f9c
  800140c:	40020800 	.word	0x40020800
- 8001410:	08005ff4 	.word	0x08005ff4
- 8001414:	08006038 	.word	0x08006038
- 8001418:	08006058 	.word	0x08006058
+ 8001410:	08005fe4 	.word	0x08005fe4
+ 8001414:	08006028 	.word	0x08006028
+ 8001418:	08006048 	.word	0x08006048
 
 0800141c <Fingerprint_Enroll>:
 
@@ -2968,10 +2968,10 @@ static HAL_StatusTypeDef Fingerprint_Enroll(uint16_t page_id)
  8001566:	3760      	adds	r7, #96	@ 0x60
  8001568:	46bd      	mov	sp, r7
  800156a:	bd80      	pop	{r7, pc}
- 800156c:	080060a8 	.word	0x080060a8
- 8001570:	080060e8 	.word	0x080060e8
- 8001574:	08006110 	.word	0x08006110
- 8001578:	08006124 	.word	0x08006124
+ 800156c:	08006098 	.word	0x08006098
+ 8001570:	080060d8 	.word	0x080060d8
+ 8001574:	08006100 	.word	0x08006100
+ 8001578:	08006114 	.word	0x08006114
  800157c:	200008b0 	.word	0x200008b0
 
 08001580 <Fingerprint_ReportMatch>:
@@ -3057,9 +3057,9 @@ static void Fingerprint_ReportMatch(uint16_t page_id)
  80015fe:	46bd      	mov	sp, r7
  8001600:	bd80      	pop	{r7, pc}
  8001602:	bf00      	nop
- 8001604:	08006148 	.word	0x08006148
- 8001608:	08006198 	.word	0x08006198
- 800160c:	08006158 	.word	0x08006158
+ 8001604:	08006138 	.word	0x08006138
+ 8001608:	08006188 	.word	0x08006188
+ 800160c:	08006148 	.word	0x08006148
  8001610:	200008d0 	.word	0x200008d0
  8001614:	200008d1 	.word	0x200008d1
  8001618:	40020400 	.word	0x40020400
@@ -3107,7 +3107,7 @@ static void Fingerprint_HandleNoMatch(void)
  8001658:	bd80      	pop	{r7, pc}
  800165a:	bf00      	nop
  800165c:	200008d1 	.word	0x200008d1
- 8001660:	08006178 	.word	0x08006178
+ 8001660:	08006168 	.word	0x08006168
  8001664:	200008d0 	.word	0x200008d0
  8001668:	40020400 	.word	0x40020400
 
@@ -4092,7 +4092,7 @@ LoopFillZerobss:
   ldr r1, =_edata
  8001bb8:	2000005c 	.word	0x2000005c
   ldr r2, =_sidata
- 8001bbc:	080062b4 	.word	0x080062b4
+ 8001bbc:	080062a4 	.word	0x080062a4
   ldr r2, =_sbss
  8001bc0:	2000019c 	.word	0x2000019c
   ldr r4, =_ebss
@@ -8237,7 +8237,7 @@ HAL_StatusTypeDef HAL_RCC_ClockConfig(const RCC_ClkInitTypeDef  *RCC_ClkInitStru
  800336a:	bf00      	nop
  800336c:	40023c00 	.word	0x40023c00
  8003370:	40023800 	.word	0x40023800
- 8003374:	08006258 	.word	0x08006258
+ 8003374:	08006248 	.word	0x08006248
  8003378:	20000000 	.word	0x20000000
  800337c:	20000004 	.word	0x20000004
 
@@ -8539,7 +8539,7 @@ uint32_t HAL_RCC_GetPCLK1Freq(void)
  80035c0:	4618      	mov	r0, r3
  80035c2:	bd80      	pop	{r7, pc}
  80035c4:	40023800 	.word	0x40023800
- 80035c8:	08006268 	.word	0x08006268
+ 80035c8:	08006258 	.word	0x08006258
 
 080035cc <HAL_RCC_GetPCLK2Freq>:
   * @note   Each time PCLK2 changes, this function must be called to update the
@@ -8565,7 +8565,7 @@ uint32_t HAL_RCC_GetPCLK2Freq(void)
  80035e8:	4618      	mov	r0, r3
  80035ea:	bd80      	pop	{r7, pc}
  80035ec:	40023800 	.word	0x40023800
- 80035f0:	08006268 	.word	0x08006268
+ 80035f0:	08006258 	.word	0x08006258
 
 080035f4 <HAL_RCCEx_PeriphCLKConfig>:
   *         the backup registers) are set to their reset values.
@@ -13097,10 +13097,10 @@ static HAL_StatusTypeDef USB_CoreReset(USB_OTG_GlobalTypeDef *USBx)
  800512a:	4798      	blx	r3
  800512c:	3601      	adds	r6, #1
  800512e:	e7f2      	b.n	8005116 <__libc_init_array+0x1e>
- 8005130:	080062ac 	.word	0x080062ac
- 8005134:	080062ac 	.word	0x080062ac
- 8005138:	080062ac 	.word	0x080062ac
- 800513c:	080062b0 	.word	0x080062b0
+ 8005130:	0800629c 	.word	0x0800629c
+ 8005134:	0800629c 	.word	0x0800629c
+ 8005138:	0800629c 	.word	0x0800629c
+ 800513c:	080062a0 	.word	0x080062a0
 
 08005140 <__retarget_lock_acquire_recursive>:
  8005140:	4770      	bx	lr
@@ -13606,11 +13606,11 @@ static HAL_StatusTypeDef USB_CoreReset(USB_OTG_GlobalTypeDef *USBx)
  80055c8:	4638      	mov	r0, r7
  80055ca:	f000 f879 	bl	80056c0 <_printf_i>
  80055ce:	e7ed      	b.n	80055ac <_svfiprintf_r+0x1c0>
- 80055d0:	08006270 	.word	0x08006270
- 80055d4:	0800627a 	.word	0x0800627a
+ 80055d0:	08006260 	.word	0x08006260
+ 80055d4:	0800626a 	.word	0x0800626a
  80055d8:	00000000 	.word	0x00000000
  80055dc:	08005335 	.word	0x08005335
- 80055e0:	08006276 	.word	0x08006276
+ 80055e0:	08006266 	.word	0x08006266
 
 080055e4 <_printf_common>:
  80055e4:	e92d 47f0 	stmdb	sp!, {r4, r5, r6, r7, r8, r9, sl, lr}
@@ -13939,8 +13939,8 @@ static HAL_StatusTypeDef USB_CoreReset(USB_OTG_GlobalTypeDef *USBx)
  80058ec:	2500      	movs	r5, #0
  80058ee:	f104 0619 	add.w	r6, r4, #25
  80058f2:	e7f5      	b.n	80058e0 <_printf_i+0x220>
- 80058f4:	08006281 	.word	0x08006281
- 80058f8:	08006292 	.word	0x08006292
+ 80058f4:	08006271 	.word	0x08006271
+ 80058f8:	08006282 	.word	0x08006282
 
 080058fc <memmove>:
  80058fc:	4288      	cmp	r0, r1
